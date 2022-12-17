@@ -1,14 +1,50 @@
-(*————————————————————————————————————————————————————————————————————————————
-   Copyright (c) 2021 Craig Ferguson <me@craigfe.io>
-   Distributed under the MIT license. See terms at the end of this file.
-  ————————————————————————————————————————————————————————————————————————————*)
-
+open Base
 open Ppxlib
 open Ast_builder.Default
 
 let namespace = "ppx_effects"
-let pp_quoted ppf s = Format.fprintf ppf "‘%s’" s
-let raise_errorf ~loc fmt = Location.raise_errorf ~loc ("%s: " ^^ fmt) namespace
+let pp_quoted ppf s = Stdlib.Format.fprintf ppf "`%s`" s
+
+let raise_errorf ~loc fmt =
+  Location.raise_errorf ~loc Stdlib.("%s: " ^^ fmt) namespace
+
+module Handler_kind = struct
+  type t = Deep | Shallow of [ `Continue | `Discontinue ]
+
+  (* let to_module_ident t : Longident.t =
+    let ident = match t with Deep -> "Deep" | Shallow _ -> "Shallow" in
+    Ldot (Lident "Ppx_effects_runtime", ident)
+
+  let to_continuation_type ~loc t (a, b) : core_type =
+    ptyp_constr ~loc
+      { loc; txt = Ldot (to_module_ident t, "continuation") }
+      [ a; b ] *)
+
+  let to_effc ~loc t effc =
+    (* For some reason, metaquot doesn't like abstract types + unquoting?? *)
+    match t with
+    | Deep ->
+        [%expr
+          let effc :
+              type continue_input.
+              continue_input Ppx_effects_runtime.t ->
+              ((continue_input, _) Ppx_effects_runtime.Deep.continuation -> _)
+              option =
+            [%e effc]
+          in
+          effc]
+    | Shallow _ ->
+        [%expr
+          let effc :
+              type continue_input.
+              continue_input Ppx_effects_runtime.t ->
+              ((continue_input, _) Ppx_effects_runtime.Shallow.continuation ->
+              _)
+              option =
+            [%e effc]
+          in
+          effc]
+end
 
 (** Cases of [match] / [try] can be partitioned into three categories:
 
@@ -16,14 +52,13 @@ let raise_errorf ~loc fmt = Location.raise_errorf ~loc ("%s: " ^^ fmt) namespace
     - effect patterns (written using [\[%effect? ...\]]);
     - return patterns (available only to [match]).
 
-    The [Stdlib.EffectHandlers] API requires passing different continuations for
-    each of these categories. *)
+    The [Stdlib.Effect] API requires passing different continuations for each of
+    these categories. *)
 module Cases = struct
-  type partitioned = { ret : cases; exn : cases; eff : cases }
+  type t = { ret : cases; exn : cases; eff : cases }
 
-  let get_effect_payload ~loc : payload -> pattern * expression option =
-    function
-    | PPat (x, y) -> (x, y)
+  let get_effect_payload ~loc : payload -> pattern = function
+    | PPat (x, None) -> x
     | _ ->
         (* The user made a mistake and forgot to add [?] after [effect] (this
            node captures expressions rather than patterns). *)
@@ -32,54 +67,46 @@ module Cases = struct
            Hint: did you mean to use %a instead?" pp_quoted "[%effect <expr>]"
           pp_quoted "[%effect? <pattern>]"
 
-  let fold_case :
-      map_subnodes:Ast_traverse.map -> case -> partitioned -> partitioned =
-   fun ~map_subnodes case acc ->
+  let fold_case : ?map_expression:(expression -> expression) -> case -> t -> t =
+   fun ?(map_expression = Fn.id) case acc ->
     match case.pc_lhs with
     | { ppat_desc = Ppat_extension ({ txt = "effect"; _ }, payload); _ } -> (
         let loc = case.pc_lhs.ppat_loc in
-        let body, internal_guard = get_effect_payload ~loc payload in
-        let pc_guard =
-          match (internal_guard, case.pc_guard) with
-          | None, None -> None
-          | (Some _ as x), None | None, (Some _ as x) -> x
-          | Some _, Some _ ->
-              raise_errorf ~loc
-                "cannot specify %a both inside and outside the [%%effect? ...] \
-                 node."
-                pp_quoted "when"
-        in
+        let body = get_effect_payload ~loc payload in
         match body with
         | [%pat? [%p? eff_pattern], [%p? k_pattern]] ->
             let pc_rhs =
               let loc = case.pc_rhs.pexp_loc in
               [%expr
-                Some
-                  (fun [%p k_pattern] ->
-                    [%e map_subnodes#expression case.pc_rhs])]
+                Some (fun [%p k_pattern] -> [%e map_expression case.pc_rhs])]
             in
-            let case = { pc_lhs = eff_pattern; pc_rhs; pc_guard } in
+            let case =
+              { pc_lhs = eff_pattern; pc_rhs; pc_guard = case.pc_guard }
+            in
             { acc with eff = case :: acc.eff }
         (* Also allow a single [_] to wildcard both effect and pattern. *)
         | [%pat? _] ->
             let pc_rhs =
               let loc = case.pc_rhs.pexp_loc in
-              [%expr Some (fun _ -> [%e map_subnodes#expression case.pc_rhs])]
+              [%expr Some (fun _ -> [%e map_expression case.pc_rhs])]
             in
-            let case = { pc_lhs = [%pat? _]; pc_rhs; pc_guard } in
+            let case =
+              { pc_lhs = [%pat? _]; pc_rhs; pc_guard = case.pc_guard }
+            in
             { acc with eff = case :: acc.eff }
         (* Can't split the pattern into effect and continuation components. *)
         | _ -> (
             let error_prefix =
-              "invalid [%effect? ...] payload. Expected a pattern for an (eff, \
-               continuation) pair"
+              "invalid [%effect? ...] payload. Expected a pattern for an \
+               (effect, continuation) pair"
             in
             (* Maybe the user missed a comma separating the two? *)
             match body with
             | {
              ppat_desc =
                Ppat_construct
-                 (effect, Some { ppat_desc = Ppat_var { txt = "k"; _ }; _ });
+                 ( effect,
+                   Some ([], { ppat_desc = Ppat_var { txt = "k"; _ }; _ }) );
              _;
             } ->
                 raise_errorf ~loc "%s.@,Hint: did you mean %a?" error_prefix
@@ -91,28 +118,28 @@ module Cases = struct
                 raise_errorf ~loc "%s, e.g. %a." error_prefix pp_quoted
                   "[%effect? Foo, k]"))
     | [%pat? exception [%p? exn_pattern]] ->
-        let pc_rhs = map_subnodes#expression case.pc_rhs in
+        let pc_rhs = map_expression case.pc_rhs in
         let case = { pc_lhs = exn_pattern; pc_rhs; pc_guard = case.pc_guard } in
         { acc with exn = case :: acc.exn }
     | _ -> { acc with ret = case :: acc.ret }
 
-  let partition : map_subnodes:Ast_traverse.map -> cases -> partitioned =
-   fun ~map_subnodes cases ->
-    ListLabels.fold_right cases
+  let partition : ?map_expression:(expression -> expression) -> cases -> t =
+   fun ?map_expression cases ->
+    List.fold_right cases
       ~init:{ ret = []; exn = []; eff = [] }
-      ~f:(fold_case ~map_subnodes)
+      ~f:(fold_case ?map_expression)
 
   let contain_effect_handler : cases -> bool =
-    List.exists (fun case ->
+    List.exists ~f:(fun case ->
         match case.pc_lhs.ppat_desc with
         | Ppat_extension ({ txt = "effect"; _ }, _) -> true
         | _ -> false)
 end
 
-(** The [Stdlib.EffectHandlers] API requires effects to happen under a function
+(** The [Stdlib.Effect] API requires effects to happen under a function
     application *)
 module Scrutinee = struct
-  type delayed = { function_ : expression; argument : expression }
+  type t = { function_ : expression; argument : expression }
 
   (* An expression is a syntactic value if its AST structure precludes it from
      raising an effect or an exception. Here we use a very simple
@@ -144,20 +171,33 @@ module Scrutinee = struct
         expr_is_syntactic_value e
     | Pexp_poly _ -> assert false
 
-  let of_expression = function
-    | [%expr [%e? function_] [%e? argument]]
+  let of_expression ~(handler_kind : Handler_kind.t) expr =
+    match (handler_kind, expr) with
+    | _, [%expr [%e? function_] [%e? argument]]
       when expr_is_syntactic_value function_ && expr_is_syntactic_value argument
       ->
         { function_; argument }
-    | e ->
+    | Deep, expr ->
         (* If the expression is not already of the form [f x] then we must
            allocate a thunk to delay the effect. *)
-        let loc = e.pexp_loc in
-        (* NOTE: here we use [`unit] over [()] in case the user has
+        let loc = expr.pexp_loc in
+        (* NOTE: here we use [`Unit] over [()] in case the user has
            shadowed the unit constructor. *)
-        let function_ = [%expr fun `unit -> [%e e]] in
-        let argument = [%expr `unit] in
+        let function_ = [%expr fun `Unit -> [%e expr]] in
+        let argument = [%expr `Unit] in
         { function_; argument }
+    | Shallow `Continue, expr ->
+        let loc = expr.pexp_loc in
+        let function_ =
+          [%expr Ppx_effects_runtime.Shallow.fiber (fun `Unit -> [%e expr])]
+        in
+        let argument = [%expr `Unit] in
+        { function_; argument }
+    | Shallow `Discontinue, expr ->
+        let loc = expr.pexp_loc in
+        raise_errorf ~loc
+          "invalid match%%discontinue scrutinee. Expected a %a expression."
+          pp_quoted "continuation exception"
 end
 
 (* Both [exnc] and [effc] require a noop case to represent an unhandled
@@ -177,13 +217,13 @@ let extensible_cases_are_exhaustive : cases -> bool =
   let pattern_matches_anything p =
     match p.ppat_desc with Ppat_any | Ppat_var _ -> true | _ -> false
   in
-  List.exists (fun case ->
+  List.exists ~f:(fun case ->
       Option.is_none case.pc_guard && pattern_matches_anything case.pc_lhs)
 
 (* Given a list of effect handlers, build a corresponding [effc] continuation to
    pass to [Deep.{try,match}_with]. *)
-let effc ~loc (cases : cases) : expression =
-  assert (cases <> []);
+let effc ~loc ~handler_kind (cases : cases) : expression =
+  assert (not (List.is_empty cases));
   let noop_case =
     match extensible_cases_are_exhaustive cases with
     | true -> []
@@ -191,15 +231,8 @@ let effc ~loc (cases : cases) : expression =
   in
   (* NOTE: the name [continue_input] is leaked to the user (accessible from
      their code, and appears in error message). *)
-  [%expr
-    let effc :
-        type continue_input.
-        continue_input Stdlib.EffectHandlers.eff ->
-        ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation -> _)
-        option =
-      [%e pexp_function ~loc (cases @ noop_case)]
-    in
-    effc]
+  Handler_kind.to_effc ~loc handler_kind
+    (pexp_function ~loc (cases @ noop_case))
 
 (* Given a list of exception handlers, build a corresponding [exnc] continuation
    to pass to [Deep.{try,match}_with]. *)
@@ -235,9 +268,10 @@ let impl : structure -> structure =
        | { pexp_desc = Pexp_match (scrutinee, cases); _ }
          when Cases.contain_effect_handler cases ->
            let scrutinee =
-             Scrutinee.of_expression (this#expression scrutinee)
+             Scrutinee.of_expression ~handler_kind:Deep
+               (this#expression scrutinee)
            in
-           let cases = Cases.partition ~map_subnodes:this cases in
+           let cases = Cases.partition ~map_expression:this#expression cases in
            let retc =
              match cases.ret with
              | [] ->
@@ -246,12 +280,12 @@ let impl : structure -> structure =
                    pp_quoted "match"
              | _ :: _ -> pexp_function ~loc cases.ret
            and exnc = exnc ~loc cases.exn
-           and effc = effc ~loc cases.eff in
+           and effc = effc ~loc ~handler_kind:Deep cases.eff in
            [%expr
-             Ppx_effects_runtime.match_with [%e scrutinee.function_]
+             Ppx_effects_runtime.Deep.match_with [%e scrutinee.function_]
                [%e scrutinee.argument]
                {
-                 Ppx_effects_runtime.retc = [%e retc];
+                 Ppx_effects_runtime.Deep.retc = [%e retc];
                  exnc = [%e exnc];
                  effc = [%e effc];
                }]
@@ -259,14 +293,15 @@ let impl : structure -> structure =
        | { pexp_desc = Pexp_try (scrutinee, cases); _ }
          when Cases.contain_effect_handler cases ->
            let scrutinee =
-             Scrutinee.of_expression (this#expression scrutinee)
+             Scrutinee.of_expression ~handler_kind:Deep
+               (this#expression scrutinee)
            in
-           let cases = Cases.partition ~map_subnodes:this cases in
-           let effc = effc ~loc cases.eff in
+           let cases = Cases.partition ~map_expression:this#expression cases in
+           let effc = effc ~loc ~handler_kind:Deep cases.eff in
            [%expr
-             Ppx_effects_runtime.try_with [%e scrutinee.function_]
+             Ppx_effects_runtime.Deep.try_with [%e scrutinee.function_]
                [%e scrutinee.argument]
-               { Ppx_effects_runtime.effc = [%e effc] }]
+               { Ppx_effects_runtime.Deep.effc = [%e effc] }]
        | e -> super#expression e
 
      method! extension =
@@ -283,12 +318,13 @@ let impl : structure -> structure =
 
 let effect_decl_of_exn_decl ~loc (exn : type_exception) : type_extension =
   let name = exn.ptyexn_constructor.pext_name in
-  let eff_type = Located.lident ~loc "Stdlib.EffectHandlers.eff" in
+  let eff_type = Located.lident ~loc "Ppx_effects_runtime.t" in
   let constrs, args =
     match exn.ptyexn_constructor.pext_kind with
-    | Pext_decl (constrs, body) ->
+    (* TODO: Provide ability to match on existentials *)
+    | Pext_decl (_, constrs, body) ->
         let body =
-          Option.map (fun typ -> ptyp_constr ~loc eff_type [ typ ]) body
+          Option.map ~f:(fun typ -> ptyp_constr ~loc eff_type [ typ ]) body
         in
         (constrs, body)
     | Pext_rebind _ ->
@@ -298,8 +334,43 @@ let effect_decl_of_exn_decl ~loc (exn : type_exception) : type_extension =
   let params = [ (ptyp_any ~loc, (NoVariance, NoInjectivity)) ] in
   type_extension ~loc ~path:eff_type ~params
     ~constructors:
-      [ extension_constructor ~loc ~name ~kind:(Pext_decl (constrs, args)) ]
+      [ extension_constructor ~loc ~name ~kind:(Pext_decl ([], constrs, args)) ]
     ~private_:Public
+
+let match_shallow ~loc ~shallow_kind scrutinee cases =
+  let scrutinee =
+    Scrutinee.of_expression ~handler_kind:(Shallow shallow_kind) scrutinee
+  in
+  let cases = Cases.partition cases in
+  let retc =
+    match cases.ret with
+    | [] ->
+        raise_errorf ~loc
+          "none of the patterns in this %a expression match values." pp_quoted
+          "match"
+    | _ :: _ -> pexp_function ~loc cases.ret
+  and exnc = exnc ~loc cases.exn
+  and effc = effc ~loc ~handler_kind:(Shallow shallow_kind) cases.eff in
+  [%expr
+    Ppx_effects_runtime.Shallow.continue_with [%e scrutinee.function_]
+      [%e scrutinee.argument]
+      {
+        Ppx_effects_runtime.Shallow.retc = [%e retc];
+        exnc = [%e exnc];
+        effc = [%e effc];
+      }]
+
+let match_continue =
+  Extension.declare "continue" Expression
+    Ast_pattern.(pstr (pstr_eval (pexp_match __ __) nil ^:: nil))
+    (fun ~loc ~path:_ scrutinee cases ->
+      match_shallow ~loc ~shallow_kind:`Continue scrutinee cases)
+
+let match_discontinue =
+  Extension.declare "discontinue" Expression
+    Ast_pattern.(pstr (pstr_eval (pexp_match __ __) nil ^:: nil))
+    (fun ~loc ~path:_ scrutinee cases ->
+      match_shallow ~loc ~shallow_kind:`Discontinue scrutinee cases)
 
 let str_effect_decl =
   Extension.declare "effect" Structure_item
@@ -316,21 +387,6 @@ let sig_effect_decl =
 let () =
   Reserved_namespaces.reserve namespace;
   Driver.register_transformation
-    ~extensions:[ str_effect_decl; sig_effect_decl ]
+    ~extensions:
+      [ str_effect_decl; sig_effect_decl; match_discontinue; match_continue ]
     ~impl namespace
-
-(*————————————————————————————————————————————————————————————————————————————
-   Copyright (c) 2021 Craig Ferguson <me@craigfe.io>
-
-   Permission to use, copy, modify, and/or distribute this software for any
-   purpose with or without fee is hereby granted, provided that the above
-   copyright notice and this permission notice appear in all copies.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-   DEALINGS IN THE SOFTWARE.
-  ————————————————————————————————————————————————————————————————————————————*)

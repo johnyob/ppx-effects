@@ -8,6 +8,6 @@
  (modules :standard \ ppx_effects_runtime)
  (kind ppx_rewriter)
  (ppx_runtime_libraries ppx_effects_runtime)
- (libraries ppxlib)
+ (libraries base ppxlib)
  (preprocess
   (pps ppxlib.metaquot)))
