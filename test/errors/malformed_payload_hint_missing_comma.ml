@@ -1,1 +1,4 @@
-let () = try f () with [%effect? E (* missing [,] *) k] -> ()
+let () =
+  try f () with
+  | [%effect? E (* missing [,] *) k] -> ()
+;;

@@ -1,5 +1,2 @@
 version = 0.24.1
-profile = conventional
-break-infix = fit-or-vertical
-parse-docstrings = true
-module-item-spacing = compact
+profile = janestreet

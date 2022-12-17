@@ -9,3 +9,4 @@ let _ =
   | [%effect? Foo b, _] when b -> 'e'
   | [%effect? Foo b, _ when not b] -> 'e'
   | [%effect? Foo _, k] -> EffectHandlers.Deep.continue k ()
+;;

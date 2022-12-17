@@ -1,1 +1,4 @@
-let () = try () with [%effect ()] -> ()
+let () =
+  try () with
+  | [%effect ()] -> ()
+;;

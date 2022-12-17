@@ -1,1 +1,4 @@
-let () = match () with [%effect? _] -> ()
+let () =
+  match () with
+  | [%effect? _] -> ()
+;;
