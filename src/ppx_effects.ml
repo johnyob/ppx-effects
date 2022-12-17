@@ -11,38 +11,17 @@ module Handler_kind = struct
     | Deep
     | Shallow of [ `Continue | `Discontinue ]
 
-  (* let to_module_ident t : Longident.t =
-    let ident = match t with Deep -> "Deep" | Shallow _ -> "Shallow" in
+  let to_module_ident t : Longident.t =
+    let ident =
+      match t with
+      | Deep -> "Deep"
+      | Shallow _ -> "Shallow"
+    in
     Ldot (Lident "Ppx_effects_runtime", ident)
+  ;;
 
   let to_continuation_type ~loc t (a, b) : core_type =
-    ptyp_constr ~loc
-      { loc; txt = Ldot (to_module_ident t, "continuation") }
-      [ a; b ] *)
-
-  let to_effc ~loc t effc =
-    (* For some reason, metaquot doesn't like abstract types + unquoting?? *)
-    match t with
-    | Deep ->
-      [%expr
-        let effc
-          : type continue_input.
-            continue_input Ppx_effects_runtime.t
-            -> ((continue_input, _) Ppx_effects_runtime.Deep.continuation -> _) option
-          =
-          [%e effc]
-        in
-        effc]
-    | Shallow _ ->
-      [%expr
-        let effc
-          : type continue_input.
-            continue_input Ppx_effects_runtime.t
-            -> ((continue_input, _) Ppx_effects_runtime.Shallow.continuation -> _) option
-          =
-          [%e effc]
-        in
-        effc]
+    ptyp_constr ~loc { loc; txt = Ldot (to_module_ident t, "continuation") } [ a; b ]
   ;;
 end
 
@@ -270,7 +249,21 @@ let effc ~loc ~handler_kind (cases : cases) : expression =
   in
   (* NOTE: the name [continue_input] is leaked to the user (accessible from
      their code, and appears in error message). *)
-  Handler_kind.to_effc ~loc handler_kind (pexp_function ~loc (cases @ noop_case))
+  [%expr
+    let effc (type continue_input)
+      :  continue_input Ppx_effects_runtime.t
+      -> ([%t
+            (* (continue_input, _) Ppx_effects_runtime.{Deep,Shallow}.continuation *)
+            Handler_kind.to_continuation_type
+              ~loc
+              handler_kind
+              ([%type: continue_input], [%type: _])]
+          -> _)
+         option
+      =
+      [%e pexp_function ~loc (cases @ noop_case)]
+    in
+    effc]
 ;;
 
 (* Given a list of exception handlers, build a corresponding [exnc] continuation
