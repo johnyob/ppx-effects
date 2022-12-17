@@ -1,11 +1,17 @@
 (lang dune 2.9)
+
 (generate_opam_files true)
 
 (name ppx_effects)
-(source (github CraigFe/ppx_effects))
+
+(source
+ (github johnyob/ppx-effects))
+
 (license MIT)
-(authors "Craig Ferguson")
-(maintainers "me@craigfe.io")
+
+(authors "Craig Ferguson, Alistair O'Brien")
+
+(maintainers "ajob410@gmail.com")
 
 (package
  (name ppx_effects)
@@ -13,5 +19,8 @@
  (description "PPX syntax for untyped effects in OCaml 5.0")
  (documentation "https://craigfe.github.io/ppx-effects")
  (depends
-  (ocaml-variants (= 4.12.0+domains))
-  (ppxlib (and (>= 0.12.0)))))
+  (ocaml-variants
+   (>= 5.0.0))
+  (ppxlib
+   (and
+    (>= 0.12.0)))))

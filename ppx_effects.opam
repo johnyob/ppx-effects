@@ -2,15 +2,15 @@
 opam-version: "2.0"
 synopsis: "PPX syntax for untyped effects in OCaml 5.0"
 description: "PPX syntax for untyped effects in OCaml 5.0"
-maintainer: ["me@craigfe.io"]
-authors: ["Craig Ferguson"]
+maintainer: ["ajob410@gmail.com"]
+authors: ["Craig Ferguson, Alistair O'Brien"]
 license: "MIT"
-homepage: "https://github.com/CraigFe/ppx_effects"
+homepage: "https://github.com/johnoyb/ppx-effects"
 doc: "https://craigfe.github.io/ppx-effects"
-bug-reports: "https://github.com/CraigFe/ppx_effects/issues"
+bug-reports: "https://github.com/johnoyb/ppx-effects/issues"
 depends: [
   "dune" {>= "2.9"}
-  "ocaml-variants" {= "4.12.0+domains"}
+  "ocaml-variants" {>= "5.0.0"}
   "ppxlib" {>= "0.12.0"}
   "odoc" {with-doc}
 ]
@@ -30,4 +30,4 @@ build: [
   ]
   ["dune" "install" "-p" name "--create-install-files" name]
 ]
-dev-repo: "git+https://github.com/CraigFe/ppx_effects.git"
+dev-repo: "git+https://github.com/johnoyb/ppx-effects.git"
