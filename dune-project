@@ -17,7 +17,6 @@
  (name ppx_effects)
  (synopsis "PPX syntax for untyped effects in OCaml 5.0")
  (description "PPX syntax for untyped effects in OCaml 5.0")
- (documentation "https://craigfe.github.io/ppx-effects")
  (depends
   (ocaml-variants
    (>= 5.0.0))
