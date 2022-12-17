@@ -63,6 +63,14 @@ module Cases = struct
 
   let get_effect_payload ~loc : payload -> pattern = function
     | PPat (x, None) -> x
+    | PPat (_, Some _) ->
+      raise_errorf
+        ~loc
+        "when clauses not permitted in %a node.@,Hint: did you mean to use %a instead?"
+        pp_quoted
+        "[%effect? <pattern>]"
+        pp_quoted
+        "[%effect? <pattern>] when <expr>"
     | _ ->
       (* The user made a mistake and forgot to add [?] after [effect] (this
            node captures expressions rather than patterns). *)
