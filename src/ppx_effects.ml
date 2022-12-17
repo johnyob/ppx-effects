@@ -357,12 +357,11 @@ let impl : structure -> structure =
 let effect_decl_of_exn_decl ~loc (exn : type_exception) : type_extension =
   let name = exn.ptyexn_constructor.pext_name in
   let eff_type = Located.lident ~loc "Ppx_effects_runtime.t" in
-  let constrs, args =
+  let existentials, constrs, args =
     match exn.ptyexn_constructor.pext_kind with
-    (* TODO: Provide ability to match on existentials *)
-    | Pext_decl (_, constrs, body) ->
+    | Pext_decl (existentials, constrs, body) ->
       let body = Option.map ~f:(fun typ -> ptyp_constr ~loc eff_type [ typ ]) body in
-      constrs, body
+      existentials, constrs, body
     | Pext_rebind _ ->
       raise_errorf
         ~loc
@@ -376,7 +375,7 @@ let effect_decl_of_exn_decl ~loc (exn : type_exception) : type_extension =
     ~path:eff_type
     ~params
     ~constructors:
-      [ extension_constructor ~loc ~name ~kind:(Pext_decl ([], constrs, args)) ]
+      [ extension_constructor ~loc ~name ~kind:(Pext_decl (existentials, constrs, args)) ]
     ~private_:Public
 ;;
 
