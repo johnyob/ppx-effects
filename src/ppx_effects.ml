@@ -1,10 +1,10 @@
-open Base
+open! Import
 open Ppxlib
 open Ast_builder.Default
 
 let namespace = "ppx_effects"
-let pp_quoted ppf s = Stdlib.Format.fprintf ppf "`%s`" s
-let raise_errorf ~loc fmt = Location.raise_errorf ~loc Stdlib.("%s: " ^^ fmt) namespace
+let pp_quoted ppf s = Format.fprintf ppf "`%s`" s
+let raise_errorf ~loc fmt = Location.raise_errorf ~loc ("%s: " ^^ fmt) namespace
 
 module Handler_kind = struct
   type t =
