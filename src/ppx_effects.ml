@@ -73,7 +73,7 @@ module Cases = struct
         "[%effect? <pattern>] when <expr>"
     | _ ->
       (* The user made a mistake and forgot to add [?] after [effect] (this
-           node captures expressions rather than patterns). *)
+         node captures expressions rather than patterns). *)
       raise_errorf
         ~loc
         "invalid node %a used as a pattern.@,Hint: did you mean to use %a instead?"
@@ -161,18 +161,17 @@ module Scrutinee = struct
   (* An expression is a syntactic value if its AST structure precludes it from
      raising an effect or an exception. Here we use a very simple
      under-approximation (avoiding multiple recursion): *)
+
   let rec expr_is_syntactic_value (expr : expression) : bool =
     match expr.pexp_desc with
     | Pexp_ident _ | Pexp_constant _ | Pexp_function _ | Pexp_fun _
     | Pexp_construct (_, None)
     | Pexp_variant (_, None)
-    | Pexp_field _ | Pexp_lazy _ -> true
+    | Pexp_lazy _ -> true
     | Pexp_let _
     | Pexp_apply _
     | Pexp_match _
     | Pexp_try _
-    | Pexp_tuple _
-    | Pexp_record _
     | Pexp_setfield _
     | Pexp_array _
     | Pexp_ifthenelse _
@@ -188,6 +187,11 @@ module Scrutinee = struct
     | Pexp_extension _
     | Pexp_unreachable -> false
     (* Congruence cases: *)
+    | Pexp_tuple es -> List.for_all es ~f:expr_is_syntactic_value
+    | Pexp_record (fields, base) ->
+      List.for_all fields ~f:(fun (_field, e) -> expr_is_syntactic_value e)
+      && Option.for_all base ~f:expr_is_syntactic_value
+    | Pexp_field (e, _)
     | Pexp_constraint (e, _)
     | Pexp_coerce (e, _, _)
     | Pexp_construct (_, Some e)
