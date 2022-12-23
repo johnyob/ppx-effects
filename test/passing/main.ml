@@ -1,6 +1,3 @@
-open Stdlib.EffectHandlers
-open Stdlib.EffectHandlers.Deep
-
 exception%effect E : string
 
 let comp () =

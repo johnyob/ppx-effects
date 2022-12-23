@@ -1,0 +1,53 @@
+open! Ppx_effects_runtime.Import
+type _ Ppx_effects_runtime.t +=  
+  | Send: int -> unit Ppx_effects_runtime.t 
+type _ Ppx_effects_runtime.t +=  
+  | Recv: int Ppx_effects_runtime.t 
+let run (comp : unit -> unit) =
+  (let rec loop_send : type a.
+     (a, unit) Effect.Shallow.continuation -> a -> unit =
+     fun k ->
+       fun v ->
+         Ppx_effects_runtime.Shallow.continue_with k v
+           {
+             Ppx_effects_runtime.Shallow.retc = (function | return -> return);
+             exnc = Ppx_effects_runtime.raise;
+             effc =
+               (let effc (type continue_input) =
+                  (let open! Ppx_effects_runtime.Shallow.Open_on_rhs in
+                     function
+                     | Send n -> Some ((fun k -> loop_recv n k ()))
+                     | Recv ->
+                         Some ((fun _ -> failwith "protocol violation"))
+                     | _ -> None : continue_input Ppx_effects_runtime.t ->
+                                     ((continue_input, _)
+                                        Ppx_effects_runtime.Shallow.continuation
+                                        -> _)
+                                       option) in
+                effc)
+           }
+   and loop_recv : type a.
+     int -> (a, unit) Effect.Shallow.continuation -> a -> unit =
+     fun n ->
+       fun k ->
+         fun v ->
+           Ppx_effects_runtime.Shallow.continue_with k v
+             {
+               Ppx_effects_runtime.Shallow.retc =
+                 (function | return -> return);
+               exnc = Ppx_effects_runtime.raise;
+               effc =
+                 (let effc (type continue_input) =
+                    (let open! Ppx_effects_runtime.Shallow.Open_on_rhs in
+                       function
+                       | Recv -> Some ((fun k -> loop_send k n))
+                       | Send _ ->
+                           Some ((fun _ -> failwith "protocol violation"))
+                       | _ -> None : continue_input Ppx_effects_runtime.t ->
+                                       ((continue_input, _)
+                                          Ppx_effects_runtime.Shallow.continuation
+                                          -> _)
+                                         option) in
+                  effc)
+             } in
+   loop_send (Effect.Shallow.fiber comp) () : unit)

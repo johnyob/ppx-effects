@@ -1,0 +1,2 @@
+File "invalid_scrutinee_in_discontinue.ml", line 2, characters 20-22:
+Error: ppx_effects: invalid match%discontinue scrutinee. Expected a `continuation exception` expression.

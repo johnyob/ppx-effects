@@ -1,0 +1,43 @@
+open! Ppx_effects_runtime.Import
+type 'a state = {
+  get: unit -> 'a ;
+  set: 'a -> unit }
+let run (type a) (type b) (fn : a state -> b) ~init:(init : a)  =
+  (let open! struct
+               type _ Ppx_effects_runtime.t +=  
+                 | Get: a Ppx_effects_runtime.t 
+             end in
+     let open! struct
+                 type _ Ppx_effects_runtime.t +=  
+                   | Set: a -> unit Ppx_effects_runtime.t 
+               end in
+       let state =
+         {
+           get = (fun () -> perform Get);
+           set = (fun content -> perform @@ (Set content))
+         } in
+       (Ppx_effects_runtime.Deep.match_with fn state
+          {
+            Ppx_effects_runtime.Deep.retc =
+              (function | ret -> (fun _ -> ret));
+            exnc = Ppx_effects_runtime.raise;
+            effc =
+              (let effc (type continue_input) =
+                 (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+                    function
+                    | Get ->
+                        Some
+                          ((fun k ->
+                              fun (content : a) -> continue k content content))
+                    | Set new_content ->
+                        Some
+                          ((fun k ->
+                              fun (_content : a) -> continue k () new_content))
+                    | _ -> None : continue_input Ppx_effects_runtime.t ->
+                                    ((continue_input, _)
+                                       Ppx_effects_runtime.Deep.continuation
+                                       -> _)
+                                      option) in
+               effc)
+          })
+         @@ init : b)

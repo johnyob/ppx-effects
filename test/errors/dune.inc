@@ -1,3 +1,25 @@
+; -------- Test: `continue_without_value_case.ml` --------
+
+; Run the PPX on the `.ml` file
+(rule
+ (targets continue_without_value_case.actual)
+ (deps
+  (:pp pp.exe)
+  (:input continue_without_value_case.ml))
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -no-color --impl %{input}"))))
+
+; Compare the post-processed output to the .expected file
+(rule
+ (alias runtest)
+ (package ppx_effects)
+ (action
+  (diff continue_without_value_case.expected
+    continue_without_value_case.actual)))
+
 ; -------- Test: `dangling.ml` --------
 
 ; Run the PPX on the `.ml` file
@@ -19,14 +41,14 @@
  (action
   (diff dangling.expected dangling.actual)))
 
-; -------- Test: `double_when_guard.ml` --------
+; -------- Test: `discontinue_without_value_case.ml` --------
 
 ; Run the PPX on the `.ml` file
 (rule
- (targets double_when_guard.actual)
+ (targets discontinue_without_value_case.actual)
  (deps
   (:pp pp.exe)
-  (:input double_when_guard.ml))
+  (:input discontinue_without_value_case.ml))
  (action
   ; expect the process to fail, capturing stderr
   (with-stderr-to
@@ -38,7 +60,52 @@
  (alias runtest)
  (package ppx_effects)
  (action
-  (diff double_when_guard.expected double_when_guard.actual)))
+  (diff discontinue_without_value_case.expected
+    discontinue_without_value_case.actual)))
+
+; -------- Test: `invalid_payload_type_in_continue.ml` --------
+
+; Run the PPX on the `.ml` file
+(rule
+ (targets invalid_payload_type_in_continue.actual)
+ (deps
+  (:pp pp.exe)
+  (:input invalid_payload_type_in_continue.ml))
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -no-color --impl %{input}"))))
+
+; Compare the post-processed output to the .expected file
+(rule
+ (alias runtest)
+ (package ppx_effects)
+ (action
+  (diff invalid_payload_type_in_continue.expected
+    invalid_payload_type_in_continue.actual)))
+
+; -------- Test: `invalid_payload_type_in_discontinue.ml` --------
+
+; Run the PPX on the `.ml` file
+(rule
+ (targets invalid_payload_type_in_discontinue.actual)
+ (deps
+  (:pp pp.exe)
+  (:input invalid_payload_type_in_discontinue.ml))
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -no-color --impl %{input}"))))
+
+; Compare the post-processed output to the .expected file
+(rule
+ (alias runtest)
+ (package ppx_effects)
+ (action
+  (diff invalid_payload_type_in_discontinue.expected
+    invalid_payload_type_in_discontinue.actual)))
 
 ; -------- Test: `invalid_payload_type_in_match.ml` --------
 
@@ -83,6 +150,28 @@
  (action
   (diff invalid_payload_type_in_try.expected
     invalid_payload_type_in_try.actual)))
+
+; -------- Test: `invalid_scrutinee_in_discontinue.ml` --------
+
+; Run the PPX on the `.ml` file
+(rule
+ (targets invalid_scrutinee_in_discontinue.actual)
+ (deps
+  (:pp pp.exe)
+  (:input invalid_scrutinee_in_discontinue.ml))
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -no-color --impl %{input}"))))
+
+; Compare the post-processed output to the .expected file
+(rule
+ (alias runtest)
+ (package ppx_effects)
+ (action
+  (diff invalid_scrutinee_in_discontinue.expected
+    invalid_scrutinee_in_discontinue.actual)))
 
 ; -------- Test: `malformed_payload.ml` --------
 
@@ -168,5 +257,26 @@
  (package ppx_effects)
  (action
   (diff rebind.expected rebind.actual)))
+
+; -------- Test: `when_inside_effect.ml` --------
+
+; Run the PPX on the `.ml` file
+(rule
+ (targets when_inside_effect.actual)
+ (deps
+  (:pp pp.exe)
+  (:input when_inside_effect.ml))
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -no-color --impl %{input}"))))
+
+; Compare the post-processed output to the .expected file
+(rule
+ (alias runtest)
+ (package ppx_effects)
+ (action
+  (diff when_inside_effect.expected when_inside_effect.actual)))
 
 

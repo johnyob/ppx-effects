@@ -1,43 +1,42 @@
-open Stdlib.EffectHandlers
-open Stdlib.EffectHandlers.Deep
-type _ Stdlib.EffectHandlers.eff +=  
-  | E: string Stdlib.EffectHandlers.eff 
+open! Ppx_effects_runtime.Import
+type _ Ppx_effects_runtime.t +=  
+  | E: string Ppx_effects_runtime.t 
 let comp () = print_string "0 "; print_string (perform E); print_string "3 "
 let () =
-  Ppx_effects_runtime.try_with comp ()
+  Ppx_effects_runtime.Deep.try_with comp ()
     {
-      Ppx_effects_runtime.effc =
-        (let effc : type continue_input.
-           continue_input Stdlib.EffectHandlers.eff ->
-             ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation ->
-                _)
-               option
-           =
-           function
-           | E ->
-               Some
-                 ((fun k ->
-                     print_string "1 "; continue k "2 "; print_string "4 "))
-           | _ -> None in
+      Ppx_effects_runtime.Deep.effc =
+        (let effc (type continue_input) =
+           (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+              function
+              | E ->
+                  Some
+                    ((fun k ->
+                        print_string "1 "; continue k "2 "; print_string "4 "))
+              | _ -> None : continue_input Ppx_effects_runtime.t ->
+                              ((continue_input, _)
+                                 Ppx_effects_runtime.Deep.continuation -> 
+                                 _)
+                                option) in
          effc)
     }
 let () =
-  Ppx_effects_runtime.match_with comp ()
+  Ppx_effects_runtime.Deep.match_with comp ()
     {
-      Ppx_effects_runtime.retc = (function | e -> e);
+      Ppx_effects_runtime.Deep.retc = (function | e -> e);
       exnc = Ppx_effects_runtime.raise;
       effc =
-        (let effc : type continue_input.
-           continue_input Stdlib.EffectHandlers.eff ->
-             ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation ->
-                _)
-               option
-           =
-           function
-           | E ->
-               Some
-                 ((fun k ->
-                     print_string "1 "; continue k "2 "; print_string "4 "))
-           | _ -> None in
+        (let effc (type continue_input) =
+           (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+              function
+              | E ->
+                  Some
+                    ((fun k ->
+                        print_string "1 "; continue k "2 "; print_string "4 "))
+              | _ -> None : continue_input Ppx_effects_runtime.t ->
+                              ((continue_input, _)
+                                 Ppx_effects_runtime.Deep.continuation -> 
+                                 _)
+                                option) in
          effc)
     }

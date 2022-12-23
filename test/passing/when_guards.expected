@@ -1,25 +1,27 @@
-type _ Stdlib.EffectHandlers.eff +=  
-  | Foo: bool -> unit Stdlib.EffectHandlers.eff 
+open! Ppx_effects_runtime.Import
+type _ Ppx_effects_runtime.t +=  
+  | Foo: bool -> unit Ppx_effects_runtime.t 
 let _ =
-  Ppx_effects_runtime.match_with (fun `unit -> false) `unit
+  Ppx_effects_runtime.Deep.match_with (fun `Unit -> false) `Unit
     {
-      Ppx_effects_runtime.retc = (function | _ when true -> 'a' | _ -> 'b');
+      Ppx_effects_runtime.Deep.retc =
+        (function | _ when true -> 'a' | _ -> 'b');
       exnc =
         (function
          | Not_found -> 'c'
          | Failure s when String.equal s "Oops" -> 'd'
          | e -> Ppx_effects_runtime.raise e);
       effc =
-        (let effc : type continue_input.
-           continue_input Stdlib.EffectHandlers.eff ->
-             ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation ->
-                _)
-               option
-           =
-           function
-           | Foo b when b -> Some ((fun _ -> 'e'))
-           | Foo b when not b -> Some ((fun _ -> 'e'))
-           | Foo _ -> Some ((fun k -> EffectHandlers.Deep.continue k ()))
-           | _ -> None in
+        (let effc (type continue_input) =
+           (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+              function
+              | Foo b when b -> Some ((fun _ -> 'e'))
+              | Foo b when not b -> Some ((fun _ -> 'e'))
+              | Foo _ -> Some ((fun k -> continue k ()))
+              | _ -> None : continue_input Ppx_effects_runtime.t ->
+                              ((continue_input, _)
+                                 Ppx_effects_runtime.Deep.continuation -> 
+                                 _)
+                                option) in
          effc)
     }

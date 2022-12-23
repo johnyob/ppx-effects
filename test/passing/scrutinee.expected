@@ -1,64 +1,85 @@
-type _ Stdlib.EffectHandlers.eff +=  
-  | E: string Stdlib.EffectHandlers.eff 
-let f () = Stdlib.EffectHandlers.perform E
+open! Ppx_effects_runtime.Import
+type _ Ppx_effects_runtime.t +=  
+  | E: string Ppx_effects_runtime.t 
+let f () = perform E
 let g () = f
 let _ =
-  Ppx_effects_runtime.try_with f ()
+  Ppx_effects_runtime.Deep.try_with f ()
     {
-      Ppx_effects_runtime.effc =
-        (let effc : type continue_input.
-           continue_input Stdlib.EffectHandlers.eff ->
-             ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation ->
-                _)
-               option
-           = function | E -> Some ((fun _ -> "")) | _ -> None in
+      Ppx_effects_runtime.Deep.effc =
+        (let effc (type continue_input) =
+           (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+              function | E -> Some ((fun _ -> "")) | _ -> None : continue_input
+                                                                   Ppx_effects_runtime.t
+                                                                   ->
+                                                                   ((continue_input,
+                                                                    _)
+                                                                    Ppx_effects_runtime.Deep.continuation
+                                                                    -> 
+                                                                    _) option) in
          effc)
     }
 let _ =
-  Ppx_effects_runtime.try_with (fun `unit -> (Fun.id f) ()) `unit
+  Ppx_effects_runtime.Deep.try_with (fun `Unit -> (Fun.id f) ()) `Unit
     {
-      Ppx_effects_runtime.effc =
-        (let effc : type continue_input.
-           continue_input Stdlib.EffectHandlers.eff ->
-             ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation ->
-                _)
-               option
-           = function | E -> Some ((fun _ -> "")) | _ -> None in
+      Ppx_effects_runtime.Deep.effc =
+        (let effc (type continue_input) =
+           (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+              function | E -> Some ((fun _ -> "")) | _ -> None : continue_input
+                                                                   Ppx_effects_runtime.t
+                                                                   ->
+                                                                   ((continue_input,
+                                                                    _)
+                                                                    Ppx_effects_runtime.Deep.continuation
+                                                                    -> 
+                                                                    _) option) in
          effc)
     }
 let _ =
-  Ppx_effects_runtime.try_with (fun `unit -> f (Fun.id ())) `unit
+  Ppx_effects_runtime.Deep.try_with (fun `Unit -> f (Fun.id ())) `Unit
     {
-      Ppx_effects_runtime.effc =
-        (let effc : type continue_input.
-           continue_input Stdlib.EffectHandlers.eff ->
-             ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation ->
-                _)
-               option
-           = function | E -> Some ((fun _ -> "")) | _ -> None in
+      Ppx_effects_runtime.Deep.effc =
+        (let effc (type continue_input) =
+           (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+              function | E -> Some ((fun _ -> "")) | _ -> None : continue_input
+                                                                   Ppx_effects_runtime.t
+                                                                   ->
+                                                                   ((continue_input,
+                                                                    _)
+                                                                    Ppx_effects_runtime.Deep.continuation
+                                                                    -> 
+                                                                    _) option) in
          effc)
     }
 let _ =
-  Ppx_effects_runtime.try_with (fun `unit -> g () ()) `unit
+  Ppx_effects_runtime.Deep.try_with (fun `Unit -> g () ()) `Unit
     {
-      Ppx_effects_runtime.effc =
-        (let effc : type continue_input.
-           continue_input Stdlib.EffectHandlers.eff ->
-             ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation ->
-                _)
-               option
-           = function | E -> Some ((fun _ -> "")) | _ -> None in
+      Ppx_effects_runtime.Deep.effc =
+        (let effc (type continue_input) =
+           (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+              function | E -> Some ((fun _ -> "")) | _ -> None : continue_input
+                                                                   Ppx_effects_runtime.t
+                                                                   ->
+                                                                   ((continue_input,
+                                                                    _)
+                                                                    Ppx_effects_runtime.Deep.continuation
+                                                                    -> 
+                                                                    _) option) in
          effc)
     }
 let _ =
-  Ppx_effects_runtime.try_with (fun `unit -> let () = () in f ()) `unit
+  Ppx_effects_runtime.Deep.try_with (fun `Unit -> let () = () in f ()) `Unit
     {
-      Ppx_effects_runtime.effc =
-        (let effc : type continue_input.
-           continue_input Stdlib.EffectHandlers.eff ->
-             ((continue_input, _) Stdlib.EffectHandlers.Deep.continuation ->
-                _)
-               option
-           = function | E -> Some ((fun _ -> "")) | _ -> None in
+      Ppx_effects_runtime.Deep.effc =
+        (let effc (type continue_input) =
+           (let open! Ppx_effects_runtime.Deep.Open_on_rhs in
+              function | E -> Some ((fun _ -> "")) | _ -> None : continue_input
+                                                                   Ppx_effects_runtime.t
+                                                                   ->
+                                                                   ((continue_input,
+                                                                    _)
+                                                                    Ppx_effects_runtime.Deep.continuation
+                                                                    -> 
+                                                                    _) option) in
          effc)
     }
