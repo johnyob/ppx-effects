@@ -23,6 +23,10 @@ module Handler_kind = struct
   let to_continuation_type ~loc t (a, b) : core_type =
     ptyp_constr ~loc { loc; txt = Ldot (to_module_ident t, "continuation") } [ a; b ]
   ;;
+
+  let open_on_rhs ~loc t =
+    pmod_ident ~loc { txt = Ldot (to_module_ident t, "Open_on_rhs"); loc }
+  ;;
 end
 
 (** Cases of [match] / [try] can be partitioned into three categories:
@@ -261,6 +265,7 @@ let effc ~loc ~handler_kind (cases : cases) : expression =
           -> _)
          option
       =
+      let open! [%m Handler_kind.open_on_rhs ~loc handler_kind] in
       [%e pexp_function ~loc (cases @ noop_case)]
     in
     effc]
@@ -436,9 +441,15 @@ let sig_effect_decl =
     (fun ~loc ~path:_ exn -> psig_typext ~loc (effect_decl_of_exn_decl ~loc exn))
 ;;
 
+let enclose_impl loc =
+  let loc = Option.value ~default:Location.none loc in
+  [ [%stri open! Ppx_effects_runtime.Enclose_impl] ], []
+;;
+
 let () =
   Reserved_namespaces.reserve namespace;
   Driver.register_transformation
+    ~enclose_impl
     ~extensions:[ str_effect_decl; sig_effect_decl; match_discontinue; match_continue ]
     ~impl
     namespace
