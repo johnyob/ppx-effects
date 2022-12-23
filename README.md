@@ -1,6 +1,10 @@
-## `ppx_effects` – syntax extensions for untyped effects in OCaml 5.0
+## `ppx_effects` 
+> A syntax extension for untyped effects in OCaml 5.0
 
-OCaml 5.0 will ship with support for [_effects_][effects-tutorial]! :tada:
+[![OCaml-CI Build Status](https://img.shields.io/endpoint?url=https://ci.ocamllabs.io/badge/johnyob/ppx-effects/main&logo=ocaml)](https://ci.ocamllabs.io/github/johnyob/ppx-effects)
+
+
+OCaml 5.0 supports [_algebraic effects_][effects-tutorial]! :tada:
 
 However, since the effect implementation is currently untyped, the compiler
 doesn't yet provide any dedicated syntax to support defining or handling
@@ -8,30 +12,14 @@ effects. This PPX provides a close approximation to the _proposed_ syntax,
 hopefully making it simpler to use effects in your OCaml 5.0 code (and easing
 future migrations to a dedicated syntax).
 
-[effects-tutorial]: https://github.com/ocamllabs/ocaml-effects-tutorial
 
-**STATUS: EXPERIMENTAL**
-
-[![OCaml-CI Build Status](https://img.shields.io/endpoint?url=https%3A%2F%2Fci.ocamllabs.io%2Fbadge%2FCraigFe%2Fppx_effects%2Fmain&logo=ocaml)](https://ci.ocamllabs.io/github/CraigFe/ppx_effects)
-
-## Usage
-
-In short:
-
-- **Declaring effects**: `effect E : string -> int` is written as `exception%effect E : string -> int`
-- **Handling effects**: `| effect (E _) k ->` is written as `| [%effect? (E _), k] ->`
-
-See the result of porting this PPX to various effectful repositories here:
-
-- [ocaml-multicore/effects-examples](https://github.com/CraigFe/effects-examples/pull/1)
-- [ocamllabs/ocaml-effects-tutorial](https://github.com/CraigFe/ocaml-effects-tutorial/pull/1)
 
 ## Install
 
 This library has not yet been released to `opam`. To install it, first 
 
 ```
-opam pin add --yes https://github.com/CraigFe/ppx_effects.git
+opam pin add --yes https://github.com/johnyob/ppx-effects.git
 opam install ppx_effects
 ```
 
@@ -44,6 +32,43 @@ libraries and executables by adding the appropriate stanza field:
  (preprocess (pps ppx_effects)))
 ```
 
+[effects-tutorial]: https://github.com/ocamllabs/ocaml-effects-tutorial
+
+## Syntax
+
+In short:
+
+- **Declaring effects**: `effect E : string -> int` is written as `exception%effect E : string -> int`. Local effects may be declared using `let exception%effect E : string -> int`. 
+- **Handling effects**: `| effect (E _) k ->` is written as `| [%effect? (E _), k] ->`.
+- **Shallow handlers** `match%continue` and `match%discontinue` for `Effect.Shallow.continue_with` and `Effect.Shallow.discontinue_with` respectively.
+
+```ocaml
+module State = struct
+  type 'a t =
+    { get : unit -> 'a
+    ; set : 'a -> unit
+    }
+
+  let run (type a b) (fn : a t -> b) ~(init : a) : b =
+    let exception%effect Get : a in
+    let exception%effect Set : a -> unit in
+    let state =
+      { get = (fun () -> perform Get)
+      ; set = (fun content -> perform (Set content)) 
+      }
+    in
+    let comp =
+      match fn state with
+      | result -> fun _ -> result
+      | [%effect? Get, k] -> 
+          fun (content : a) -> continue k content content
+      | [%effect? Set new_content, k] -> 
+          fun (_content : a) -> continue k () new_content
+    in
+    comp init
+  ;;
+end
+```
 ## Details
 
 Using the PPX should ideally be exactly like using the dedicated syntax.
