@@ -458,7 +458,7 @@ let sig_effect_decl =
 
 let enclose_impl loc =
   let loc = Option.value ~default:Location.none loc in
-  [ [%stri open! Ppx_effects_runtime.Enclose_impl] ], []
+  [ [%stri open! Ppx_effects_runtime.Import] ], []
 ;;
 
 let () =

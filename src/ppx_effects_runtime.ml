@@ -5,7 +5,7 @@ let raise = Stdlib.raise
 
 include Stdlib.Effect
 
-module Enclose_impl = struct
+module Import = struct
   let perform = perform
 end
 
