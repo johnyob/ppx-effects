@@ -465,7 +465,13 @@ let () =
   Reserved_namespaces.reserve namespace;
   Driver.register_transformation
     ~enclose_impl
-    ~extensions:[ str_effect_decl; sig_effect_decl; match_discontinue; match_continue; exp_effect_decl ]
+    ~extensions:
+      [ str_effect_decl
+      ; sig_effect_decl
+      ; match_discontinue
+      ; match_continue
+      ; exp_effect_decl
+      ]
     ~impl
     namespace
 ;;

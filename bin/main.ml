@@ -8,9 +8,10 @@ let comp () =
 
 let raise f = f
 
-let foo () = 
+let foo () =
   let exception%effect F : string in
   perform F
+;;
 
 let main () =
   try comp () with
@@ -39,3 +40,25 @@ let run (comp : unit -> unit) : unit =
   in
   loop_send (Effect.Shallow.fiber comp) ()
 ;;
+
+module State = struct
+  type 'a t =
+    { get : unit -> 'a
+    ; set : 'a -> unit
+    }
+
+  let run (type a b) (fn : a t -> b) ~(init : a) : b =
+    let exception%effect Get : a in
+    let exception%effect Set : a -> unit in
+    let state =
+      { get = (fun () -> perform Get); set = (fun content -> perform (Set content)) }
+    in
+    let comp =
+      match fn state with
+      | result -> fun _ -> result
+      | [%effect? Get, k] -> fun (content : a) -> continue k content content
+      | [%effect? Set new_content, k] -> fun (_content : a) -> continue k () new_content
+    in
+    comp init
+  ;;
+end
