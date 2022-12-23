@@ -2,17 +2,21 @@ exception%effect E : string
 
 let comp () =
   print_string "0 ";
-  print_string (Effect.perform E);
+  print_string (perform E);
   print_string "3 "
 ;;
 
 let raise f = f
 
+let foo () = 
+  let exception%effect F : string in
+  perform F
+
 let main () =
   try comp () with
   | [%effect? E, k] ->
     print_string "1 ";
-    Effect.Deep.continue k "2 ";
+    continue k "2 ";
     print_string "4 "
 ;;
 
