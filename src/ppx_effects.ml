@@ -359,11 +359,11 @@ let impl : structure -> structure =
     #structure
 ;;
 
-let effect_decl_of_exn_decl ~loc (exn : type_exception) : type_extension =
-  let name = exn.ptyexn_constructor.pext_name in
+let effect_decl_of_exn_decl ~loc (exn : extension_constructor) : type_extension =
+  let name = exn.pext_name in
   let eff_type = Located.lident ~loc "Ppx_effects_runtime.t" in
   let existentials, constrs, args =
-    match exn.ptyexn_constructor.pext_kind with
+    match exn.pext_kind with
     | Pext_decl (existentials, constrs, body) ->
       let body = Option.map ~f:(fun typ -> ptyp_constr ~loc eff_type [ typ ]) body in
       existentials, constrs, body
@@ -430,7 +430,21 @@ let str_effect_decl =
     "effect"
     Structure_item
     Ast_pattern.(pstr (pstr_exception __ ^:: nil))
-    (fun ~loc ~path:_ exn -> pstr_typext ~loc (effect_decl_of_exn_decl ~loc exn))
+    (fun ~loc ~path:_ exn ->
+      pstr_typext ~loc (effect_decl_of_exn_decl ~loc exn.ptyexn_constructor))
+;;
+
+let exp_effect_decl =
+  Extension.declare
+    "effect"
+    Expression
+    Ast_pattern.(pstr (pstr_eval (pexp_letexception __ __) nil ^:: nil))
+    (fun ~loc ~path:_ exn in_ ->
+      [%expr
+        let open! struct
+          [%%i pstr_typext ~loc (effect_decl_of_exn_decl ~loc exn)]
+        end in
+        [%e in_]])
 ;;
 
 let sig_effect_decl =
@@ -438,7 +452,8 @@ let sig_effect_decl =
     "effect"
     Signature_item
     Ast_pattern.(psig (psig_exception __ ^:: nil))
-    (fun ~loc ~path:_ exn -> psig_typext ~loc (effect_decl_of_exn_decl ~loc exn))
+    (fun ~loc ~path:_ exn ->
+      psig_typext ~loc (effect_decl_of_exn_decl ~loc exn.ptyexn_constructor))
 ;;
 
 let enclose_impl loc =
@@ -450,7 +465,7 @@ let () =
   Reserved_namespaces.reserve namespace;
   Driver.register_transformation
     ~enclose_impl
-    ~extensions:[ str_effect_decl; sig_effect_decl; match_discontinue; match_continue ]
+    ~extensions:[ str_effect_decl; sig_effect_decl; match_discontinue; match_continue; exp_effect_decl ]
     ~impl
     namespace
 ;;
