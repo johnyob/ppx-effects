@@ -1,5 +1,7 @@
 exception%effect E : string
 
+exception%effect F = E
+
 let comp () =
   print_string "0 ";
   print_string (perform E);

@@ -362,25 +362,19 @@ let impl : structure -> structure =
 let effect_decl_of_exn_decl ~loc (exn : extension_constructor) : type_extension =
   let name = exn.pext_name in
   let eff_type = Located.lident ~loc "Ppx_effects_runtime.t" in
-  let existentials, constrs, args =
+  let kind =
     match exn.pext_kind with
-    | Pext_decl (existentials, constrs, body) ->
-      let body = Option.map ~f:(fun typ -> ptyp_constr ~loc eff_type [ typ ]) body in
-      existentials, constrs, body
-    | Pext_rebind _ ->
-      raise_errorf
-        ~loc
-        "cannot process effect defined as an alias of %a."
-        pp_quoted
-        name.txt
+    | Pext_decl (existentials, constr_args, ret) ->
+      let ret = Option.map ~f:(fun typ -> ptyp_constr ~loc eff_type [ typ ]) ret in
+      Pext_decl (existentials, constr_args, ret)
+    | Pext_rebind constr -> Pext_rebind constr
   in
   let params = [ ptyp_any ~loc, (NoVariance, NoInjectivity) ] in
   type_extension
     ~loc
     ~path:eff_type
     ~params
-    ~constructors:
-      [ extension_constructor ~loc ~name ~kind:(Pext_decl (existentials, constrs, args)) ]
+    ~constructors:[ extension_constructor ~loc ~name ~kind ]
     ~private_:Public
 ;;
 

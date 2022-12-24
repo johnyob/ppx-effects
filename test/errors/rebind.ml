@@ -1,1 +1,0 @@
-exception%effect E = E

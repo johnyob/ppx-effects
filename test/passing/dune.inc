@@ -85,6 +85,35 @@
  (action
   (run ./main.exe)))
 
+; -------- Test: `rebind.ml` --------; The PPX-dependent executable under test
+(executable
+ (name rebind)
+ (modules rebind)
+ (preprocess (pps ppx_effects)))
+
+; Run the PPX on the `.ml` file
+(rule
+ (targets rebind.actual)
+ (deps
+  (:pp pp.exe)
+  (:input rebind.ml))
+ (action
+  (run ./%{pp} --impl %{input} -o %{targets})))
+
+; Compare the post-processed output to the .expected file
+(rule
+ (alias runtest)
+ (package ppx_effects)
+ (action
+  (diff rebind.expected rebind.actual)))
+
+; Ensure that the post-processed executable runs correctly
+(rule
+ (alias runtest)
+ (package ppx_effects)
+ (action
+  (run ./rebind.exe)))
+
 ; -------- Test: `scrutinee.ml` --------; The PPX-dependent executable under test
 (executable
  (name scrutinee)

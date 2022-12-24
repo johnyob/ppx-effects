@@ -1,0 +1,5 @@
+open! Ppx_effects_runtime.Import
+type _ Ppx_effects_runtime.t +=  
+  | E: string Ppx_effects_runtime.t 
+type _ Ppx_effects_runtime.t +=  
+  | F = E
