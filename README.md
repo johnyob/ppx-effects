@@ -1,4 +1,4 @@
-## `ppx_effects` 
+## ✨ ppx-effects
 > A syntax extension for untyped effects in OCaml 5.0
 
 [![OCaml-CI Build Status](https://img.shields.io/endpoint?url=https://ci.ocamllabs.io/badge/johnyob/ppx-effects/main&logo=ocaml)](https://ci.ocamllabs.io/github/johnyob/ppx-effects)
